@@ -1,0 +1,71 @@
+import subprocess
+import time
+import webbrowser
+
+from discord_webhook import DiscordWebhook
+
+STEAM_URL = "steam://rungameid/1694960"
+WEBHOOK_URL = 'https://discord.com/api/webhooks/1113767964320206848/x_PrVcVrQHcoNiO-wz4I-Ucc_a0-VHeSlybJZRIDmhF6ysYr2gEs6waS2dReOMem-Pfg'
+APP_NAME = 'FurryFeet.exe'
+REBOOT_DELAY = 30  # Adjust this delay as per your requirements
+
+
+
+def send_discord_message(content):
+    webhook = DiscordWebhook(url=WEBHOOK_URL, content=content)
+    response = webhook.execute()
+    return response
+
+def is_application_running(app_name):
+    try:
+        output = subprocess.check_output("pgrep -x " + app_name, shell=True)
+        if output:
+            return True
+    except subprocess.CalledProcessError:
+        return False
+
+def start_steam_game():
+    webbrowser.open(STEAM_URL)
+
+
+start_steam_game()
+
+def main():
+    previous_app_status = False
+    rebooting = False
+
+    start_time = None
+    first_run = True
+
+    start_steam_game()
+
+    while True:
+        current_app_status = is_application_running(APP_NAME)
+
+        if current_app_status and not previous_app_status:
+            # Game has just started
+            start_time = time.time()  # Start the timer when the game starts
+            msg = "Furry Feet Is Running!"
+            send_discord_message(msg)
+            rebooting = False
+            first_run = False
+
+        elif not current_app_status and previous_app_status and not rebooting:
+            # Game has just shut down and is not in the process of rebooting
+            if start_time is not None and not first_run:
+                end_time = time.time()  # Stop the timer when the game stops
+                time_passed = (end_time - start_time) / 3600
+                msg = f"Furry Feet Has Shutdown.\n[HOURS RUN]: {round(time_passed, 2)}"
+                send_discord_message(msg)
+            rebooting = True
+
+        if rebooting and not current_app_status:
+            # Game is not running and should be rebooted
+            start_steam_game()
+            msg = "[REBOOTING..]"
+            send_discord_message(msg)
+            time.sleep(REBOOT_DELAY)  # wait before checking the status again
+        
+        previous_app_status = current_app_status
+
+main()
